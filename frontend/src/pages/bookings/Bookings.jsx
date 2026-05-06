@@ -1,25 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Download, Filter, Search, X } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge'
-import { bookings, halls } from '../../data/mockData'
-
-const exportCSV = (rows) => {
-  const headers = ['ID', 'Date', 'Time', 'Hall', 'Event', 'Customer', 'Phone', 'Guests', 'Total (PKR)', 'Payment']
-  const csv = [headers, ...rows.map(b => [b.id, b.date, b.time, b.hall, b.eventType, b.customer, b.phone, b.guests, b.totalAmount, b.paymentStatus])].map(r => r.join(',')).join('\n')
-  const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv); a.download = 'bookings.csv'; a.click()
-}
+import { getBookings, getHalls, exportBookingsCSV } from '../../lib/api'
 
 export default function Bookings() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  useEffect(() => {
-    if (location.state?.toast) {
-      showToast(location.state.toast)
-      window.history.replaceState({}, '')
-    }
-  }, [])
+  const [bookings, setBookings] = useState([])
+  const [halls, setHalls] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 1 })
 
   const [search, setSearch] = useState('')
   const [filterHall, setFilterHall] = useState('all')
@@ -32,25 +24,46 @@ export default function Bookings() {
   const perPage = 6
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500) }
-  const clearFilters = () => { setSearch(''); setFilterHall('all'); setFilterPayment('all'); setFilterStatus('all'); setDateFrom(''); setDateTo(''); setPage(1) }
 
-  const filtered = bookings.filter(b => {
-    const matchSearch = !search || b.customer.toLowerCase().includes(search.toLowerCase()) || b.id.toLowerCase().includes(search.toLowerCase())
-    const matchHall = filterHall === 'all' || b.hall === filterHall
-    const matchPayment = filterPayment === 'all' || b.paymentStatus === filterPayment
-    const matchStatus = filterStatus === 'all' || b.status === filterStatus
-    const matchFrom = !dateFrom || b.date >= dateFrom
-    const matchTo = !dateTo || b.date <= dateTo
-    return matchSearch && matchHall && matchPayment && matchStatus && matchFrom && matchTo
-  })
+  useEffect(() => {
+    if (location.state?.toast) {
+      showToast(location.state.toast)
+      window.history.replaceState({}, '')
+    }
+    getHalls().then(r => setHalls(r.data)).catch(() => {})
+  }, [])
 
-  const totalPages = Math.ceil(filtered.length / perPage)
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage)
+  const fetchBookings = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = { page, limit: perPage }
+      if (search) params.search = search
+      if (filterHall !== 'all') params.hall = filterHall
+      if (filterPayment !== 'all') params.paymentStatus = filterPayment
+      if (filterStatus !== 'all') params.status = filterStatus
+      if (dateFrom) params.dateFrom = dateFrom
+      if (dateTo) params.dateTo = dateTo
 
-  const totalRevenue = filtered.reduce((s, b) => s + b.totalAmount, 0)
-  const activeCount = filtered.filter(b => b.status === 'upcoming').length
-  const pendingCount = filtered.filter(b => b.paymentStatus === 'pending').length
-  const occupancy = Math.round((activeCount / bookings.filter(b => b.status === 'upcoming').length) * 100) || 0
+      const res = await getBookings(params)
+      setBookings(res.data)
+      setPagination(res.pagination)
+    } catch {
+      showToast('Failed to load bookings.')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, search, filterHall, filterPayment, filterStatus, dateFrom, dateTo])
+
+  useEffect(() => { fetchBookings() }, [fetchBookings])
+
+  const clearFilters = () => {
+    setSearch(''); setFilterHall('all'); setFilterPayment('all')
+    setFilterStatus('all'); setDateFrom(''); setDateTo(''); setPage(1)
+  }
+
+  const totalRevenue = bookings.reduce((s, b) => s + b.totalAmount, 0)
+  const activeCount = bookings.filter(b => b.status === 'upcoming').length
+  const pendingCount = bookings.filter(b => b.paymentStatus === 'pending').length
 
   return (
     <div className="space-y-5">
@@ -59,18 +72,19 @@ export default function Bookings() {
           {toast}
         </div>
       )}
+
       {/* Summary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: `PKR ${(totalRevenue / 1000).toFixed(0)}K`, sub: '+10% vs last month' },
-          { label: 'Active Bookings', value: activeCount, sub: 'Across all venues' },
-          { label: 'Pending Requests', value: pendingCount, sub: 'Requiring immediate action' },
-          { label: 'Occupancy Rate', value: `${occupancy}%`, sub: 'This month' },
+          { label: 'Total Revenue', value: `PKR ${(totalRevenue / 1000).toFixed(0)}K`, sub: 'Current filter' },
+          { label: 'Active Bookings', value: pagination.total, sub: 'Matching current filter' },
+          { label: 'Pending Payments', value: pendingCount, sub: 'On this page' },
+          { label: 'Upcoming Events', value: activeCount, sub: 'On this page' },
         ].map(s => (
           <div key={s.label} className="card">
             <p className="text-text-muted text-xs uppercase tracking-wide">{s.label}</p>
             <p className="text-2xl font-bold text-text-primary mt-1">{s.value}</p>
-            <p className="text-xs text-green-600 mt-1">{s.sub}</p>
+            <p className="text-xs text-text-muted mt-1">{s.sub}</p>
           </div>
         ))}
       </div>
@@ -97,7 +111,7 @@ export default function Bookings() {
             <label className="label">Hall</label>
             <select value={filterHall} onChange={e => { setFilterHall(e.target.value); setPage(1) }} className="input w-44">
               <option value="all">All Venues</option>
-              {halls.map(h => <option key={h.id} value={h.name}>{h.name}</option>)}
+              {halls.map(h => <option key={h._id} value={h._id}>{h.name}</option>)}
             </select>
           </div>
           <div>
@@ -116,7 +130,7 @@ export default function Bookings() {
               <option value="completed">Completed</option>
             </select>
           </div>
-          <button onClick={() => { setPage(1); showToast('Filters applied.') }} className="btn-secondary flex items-center gap-1.5 self-end">
+          <button onClick={() => { setPage(1); fetchBookings() }} className="btn-secondary flex items-center gap-1.5 self-end">
             <Filter size={14} /> Apply
           </button>
           <button onClick={clearFilters} className="btn-secondary flex items-center gap-1.5 self-end text-text-muted">
@@ -132,7 +146,7 @@ export default function Bookings() {
       <div className="card p-0 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <p className="font-semibold text-text-primary">All Bookings</p>
-          <button onClick={() => exportCSV(filtered)} className="btn-secondary flex items-center gap-1.5 text-xs py-1.5">
+          <button onClick={() => exportBookingsCSV()} className="btn-secondary flex items-center gap-1.5 text-xs py-1.5">
             <Download size={13} /> Export CSV
           </button>
         </div>
@@ -146,26 +160,28 @@ export default function Bookings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {paginated.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={7} className="table-td text-center text-text-muted py-10">Loading…</td></tr>
+              ) : bookings.length === 0 ? (
                 <tr><td colSpan={7} className="table-td text-center text-text-muted py-10">No bookings found.</td></tr>
-              ) : paginated.map(b => (
-                <tr key={b.id} className="hover:bg-cream/40 transition-colors">
-                  <td className="table-td font-mono text-xs text-text-muted">{b.id}</td>
+              ) : bookings.map(b => (
+                <tr key={b._id} className="hover:bg-cream/40 transition-colors">
+                  <td className="table-td font-mono text-xs text-text-muted">{b.bookingId}</td>
                   <td className="table-td">
-                    <p className="font-medium">{b.date}</p>
+                    <p className="font-medium">{new Date(b.date).toLocaleDateString('en-GB')}</p>
                     <p className="text-xs text-text-muted">{b.time}</p>
                   </td>
-                  <td className="table-td">{b.hall}</td>
+                  <td className="table-td">{b.hall?.name || b.hallName}</td>
                   <td className="table-td">{b.eventType}</td>
                   <td className="table-td">
-                    <p className="font-medium">{b.customer}</p>
-                    <p className="text-xs text-text-muted">{b.email}</p>
+                    <p className="font-medium">{b.customer.name}</p>
+                    <p className="text-xs text-text-muted">{b.customer.email}</p>
                   </td>
                   <td className="table-td"><StatusBadge status={b.paymentStatus} /></td>
                   <td className="table-td">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => navigate(`/bookings/${b.id}`)} className="text-accent text-xs font-medium hover:underline">View</button>
-                      <button onClick={() => navigate(`/bookings/${b.id}/edit`)} className="text-text-muted text-xs hover:text-text-primary">Edit</button>
+                      <button onClick={() => navigate(`/bookings/${b._id}`)} className="text-accent text-xs font-medium hover:underline">View</button>
+                      <button onClick={() => navigate(`/bookings/${b._id}/edit`)} className="text-text-muted text-xs hover:text-text-primary">Edit</button>
                     </div>
                   </td>
                 </tr>
@@ -175,11 +191,13 @@ export default function Bookings() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {pagination.pages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-border">
-            <p className="text-xs text-text-muted">Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, filtered.length)} of {filtered.length} entries</p>
+            <p className="text-xs text-text-muted">
+              Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, pagination.total)} of {pagination.total} entries
+            </p>
             <div className="flex gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(p => (
                 <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${p === page ? 'bg-accent text-white' : 'hover:bg-cream text-text-muted'}`}>
                   {p}
                 </button>

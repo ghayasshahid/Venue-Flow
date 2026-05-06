@@ -11,13 +11,19 @@ connectDB().catch((err) => {
   process.exit(1)
 })
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }))
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }))
 app.use(express.json())
 
-// Routes (add as you build them)
-// app.use('/api/auth', require('./routes/auth'))
-// app.use('/api/venues', require('./routes/venues'))
-// app.use('/api/bookings', require('./routes/bookings'))
+// Admin routes
+app.use('/api/admin/auth', require('./routes/auth'))
+app.use('/api/admin/dashboard', require('./routes/dashboard'))
+app.use('/api/admin/halls', require('./routes/halls'))
+app.use('/api/admin/bookings', require('./routes/bookings'))
+app.use('/api/admin/requests', require('./routes/requests'))
+app.use('/api/admin/finance', require('./routes/finance'))
+app.use('/api/admin/reports', require('./routes/reports'))
+app.use('/api/admin/menu-packages', require('./routes/menuPackages'))
+app.use('/api/admin/decor-packages', require('./routes/decorPackages'))
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Server is running' })

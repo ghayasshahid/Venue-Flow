@@ -1,65 +1,131 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Edit, CreditCard, StickyNote, Trash2, FileText, CheckCircle } from 'lucide-react'
 import StatusBadge from '../../components/StatusBadge'
-import { bookings, halls, menuPackages, decorPackages, expenses } from '../../data/mockData'
+import { getBooking, updateBooking, getExpenses, getMenuPackages, getDecorPackages, createTransaction } from '../../lib/api'
 
 export default function BookingDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const booking = bookings.find(b => b.id === id)
+
+  const [booking, setBooking] = useState(null)
+  const [bookingExpenses, setBookingExpenses] = useState([])
+  const [menuPackages, setMenuPackages] = useState([])
+  const [decorPackages, setDecorPackages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
   const [note, setNote] = useState('')
-  const [notes, setNotes] = useState(booking?.notes ? [booking.notes] : [])
+  const [notes, setNotes] = useState([])
   const [showExpense, setShowExpense] = useState(false)
-  const [paymentStatus, setPaymentStatus] = useState(booking?.paymentStatus || 'pending')
+  const [paymentStatus, setPaymentStatus] = useState('pending')
   const [paidToast, setPaidToast] = useState(false)
+  const [showRecordPayment, setShowRecordPayment] = useState(false)
+  const [recordAmount, setRecordAmount] = useState('')
+  const [recordSaving, setRecordSaving] = useState(false)
 
-  // Wastage log state
-  const [wastageItem, setWastageItem] = useState('')
-  const [wastageQty, setWastageQty] = useState('')
-  const [wastageNote, setWastageNote] = useState('')
-  const [wastageEntries, setWastageEntries] = useState([])
 
-  if (!booking) return (
+  useEffect(() => {
+    Promise.all([getBooking(id), getExpenses({ bookingId: id }), getMenuPackages(), getDecorPackages()])
+      .then(([bRes, eRes, menuRes, decorRes]) => {
+        const b = bRes.data
+        setBooking(b)
+        setPaymentStatus(b.paymentStatus)
+        setNotes(b.notes ? [b.notes] : [])
+        setBookingExpenses(eRes.data)
+        setMenuPackages(menuRes.data)
+        setDecorPackages(decorRes.data)
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  if (loading) return <div className="card text-center py-16 text-text-muted">Loading…</div>
+  if (notFound || !booking) return (
     <div className="card text-center py-16">
       <p className="text-text-muted">Booking not found.</p>
       <button onClick={() => navigate('/bookings')} className="btn-primary mt-4">Back to Bookings</button>
     </div>
   )
 
-  const bookingExpenses = expenses.filter(e => e.bookingId === booking.id)
   const totalExpenses = bookingExpenses.reduce((s, e) => s + e.amount, 0)
   const profit = booking.totalAmount - totalExpenses
-
-  const hall = halls.find(h => h.name === booking.hall)
   const menu = menuPackages.find(m => m.name === booking.menu)
   const decor = decorPackages.find(d => d.name === booking.decor)
 
-  const addNote = () => {
-    if (note.trim()) { setNotes(n => [...n, note.trim()]); setNote('') }
+  const addNote = async () => {
+    if (!note.trim()) return
+    const newNotes = [...notes, note.trim()]
+    setNotes(newNotes)
+    setNote('')
+    await updateBooking(id, { notes: newNotes.join('\n') }).catch(() => {})
   }
 
-  const markAsPaid = () => {
-    setPaymentStatus('paid')
-    setPaidToast(true)
-    setTimeout(() => setPaidToast(false), 3000)
+  const removeNote = async (i) => {
+    const newNotes = notes.filter((_, j) => j !== i)
+    setNotes(newNotes)
+    await updateBooking(id, { notes: newNotes.join('\n') }).catch(() => {})
   }
 
-  const addWastageEntry = () => {
-    if (!wastageItem.trim() || !wastageQty.trim()) return
-    setWastageEntries(e => [...e, { item: wastageItem.trim(), qty: wastageQty.trim(), note: wastageNote.trim() }])
-    setWastageItem(''); setWastageQty(''); setWastageNote('')
+  const markAsPaid = async () => {
+    try {
+      await updateBooking(id, { paymentStatus: 'paid' })
+      const balance = booking.totalAmount - booking.advance
+      if (balance > 0) {
+        await createTransaction({
+          booking: id,
+          bookingId: booking.bookingId,
+          customer: booking.customer.name,
+          eventType: booking.eventType,
+          amount: balance,
+          type: 'partial',
+          status: 'paid',
+          date: new Date().toISOString(),
+        })
+      }
+      setPaymentStatus('paid')
+      setPaidToast(true)
+      setTimeout(() => setPaidToast(false), 3000)
+    } catch {
+      // silently fail
+    }
+  }
+
+  const recordBalancePayment = async () => {
+    const amount = Number(recordAmount)
+    if (!amount || amount <= 0) return
+    setRecordSaving(true)
+    try {
+      await createTransaction({
+        booking: id,
+        bookingId: booking.bookingId,
+        customer: booking.customer.name,
+        eventType: booking.eventType,
+        amount,
+        type: 'partial',
+        status: 'paid',
+        date: new Date().toISOString(),
+      })
+      setShowRecordPayment(false)
+      setRecordAmount('')
+      setPaidToast(true)
+      setTimeout(() => setPaidToast(false), 3000)
+    } catch {
+      // silently fail
+    } finally {
+      setRecordSaving(false)
+    }
   }
 
   const exportPDF = () => window.print()
 
+  const eventDate = new Date(booking.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+
   return (
     <div className="space-y-5">
-      {/* Paid toast */}
       {paidToast && (
         <div className="fixed top-5 right-5 z-50 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium">
-          <CheckCircle size={16} /> Payment marked as paid
+          <CheckCircle size={16} /> Payment recorded — revenue updated
         </div>
       )}
 
@@ -71,11 +137,11 @@ export default function BookingDetails() {
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-text-primary">{booking.id}</p>
+              <p className="font-semibold text-text-primary">{booking.bookingId}</p>
               <StatusBadge status={booking.status} />
               <StatusBadge status={paymentStatus} />
             </div>
-            <p className="text-sm text-text-muted mt-0.5">{booking.eventType} · {booking.date} at {booking.time}</p>
+            <p className="text-sm text-text-muted mt-0.5">{booking.eventType} · {eventDate} at {booking.time}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -97,11 +163,11 @@ export default function BookingDetails() {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: 'Event Type', value: booking.eventType },
-                { label: 'Date', value: booking.date },
+                { label: 'Date', value: eventDate },
                 { label: 'Time', value: booking.time },
                 { label: 'Guest Count', value: `${booking.guests} guests` },
-                { label: 'Hall / Venue', value: booking.hall },
-                { label: 'Hall Capacity', value: hall ? `${hall.capacity} guests` : '—' },
+                { label: 'Hall / Venue', value: booking.hall?.name || booking.hallName },
+                { label: 'Hall Capacity', value: booking.hall?.capacity ? `${booking.hall.capacity} guests` : '—' },
               ].map(f => (
                 <div key={f.label}>
                   <p className="label">{f.label}</p>
@@ -116,9 +182,9 @@ export default function BookingDetails() {
             <p className="font-semibold text-text-primary mb-4">Customer Information</p>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: 'Full Name', value: booking.customer },
-                { label: 'Phone', value: booking.phone },
-                { label: 'Email', value: booking.email },
+                { label: 'Full Name', value: booking.customer.name },
+                { label: 'Phone', value: booking.customer.phone },
+                { label: 'Email', value: booking.customer.email },
               ].map(f => (
                 <div key={f.label}>
                   <p className="label">{f.label}</p>
@@ -134,7 +200,7 @@ export default function BookingDetails() {
               <p className="font-semibold text-text-primary mb-3">Menu Package</p>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">{booking.menu}</span>
-                <span className="text-sm text-text-muted">PKR {menu?.price?.toLocaleString()}/head</span>
+                <span className="text-sm text-text-muted">{menu ? `PKR ${menu.price.toLocaleString()}/head` : ''}</span>
               </div>
               {menu?.items?.length > 0 && (
                 <ul className="space-y-1">
@@ -148,7 +214,7 @@ export default function BookingDetails() {
               <p className="font-semibold text-text-primary mb-3">Décor Package</p>
               <p className="text-sm font-medium mb-1">{booking.decor}</p>
               <p className="text-xs text-text-muted mb-2">{decor?.description}</p>
-              <p className="text-sm text-text-muted">PKR {decor?.price?.toLocaleString()}</p>
+              {decor?.price > 0 && <p className="text-sm text-text-muted">PKR {decor.price.toLocaleString()}</p>}
             </div>
           </div>
 
@@ -160,7 +226,7 @@ export default function BookingDetails() {
               {notes.map((n, i) => (
                 <div key={i} className="flex items-start justify-between bg-cream rounded-lg p-3">
                   <p className="text-sm text-text-primary">{n}</p>
-                  <button onClick={() => setNotes(ns => ns.filter((_, j) => j !== i))} className="ml-3 text-red-400 hover:text-red-600">
+                  <button onClick={() => removeNote(i)} className="ml-3 text-red-400 hover:text-red-600">
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -200,49 +266,35 @@ export default function BookingDetails() {
               <p className="label">Payment Status</p>
               <StatusBadge status={paymentStatus} />
             </div>
-            {paymentStatus === 'pending' && (
+            {paymentStatus !== 'paid' && (
               <button onClick={markAsPaid} className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
                 <CreditCard size={14} /> Mark as Paid
               </button>
             )}
-            {paymentStatus === 'paid' && (
-              <div className="mt-4 flex items-center gap-2 text-green-600 text-sm font-medium">
-                <CheckCircle size={15} /> Fully settled
+            {paymentStatus === 'paid' && !showRecordPayment && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                  <CheckCircle size={15} /> Fully settled
+                </div>
+                <button onClick={() => { setShowRecordPayment(true); setRecordAmount(String(booking.totalAmount - booking.advance)) }} className="text-xs text-text-muted hover:text-accent underline">
+                  Record a payment transaction
+                </button>
+              </div>
+            )}
+            {paymentStatus === 'paid' && showRecordPayment && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-text-muted font-medium">Record payment amount (PKR)</p>
+                <input type="number" value={recordAmount} onChange={e => setRecordAmount(e.target.value)} className="input text-sm" placeholder={String(booking.totalAmount - booking.advance)} />
+                <div className="flex gap-2">
+                  <button onClick={recordBalancePayment} disabled={recordSaving} className="btn-primary flex-1 text-xs disabled:opacity-60">
+                    {recordSaving ? 'Saving…' : 'Record'}
+                  </button>
+                  <button onClick={() => setShowRecordPayment(false)} className="btn-secondary text-xs">Cancel</button>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Wastage Log (completed bookings) */}
-          {booking.status === 'completed' && (
-            <div className="card">
-              <p className="font-semibold text-text-primary mb-3">Food Wastage Log</p>
-              <p className="text-xs text-text-muted mb-3">Record any food wastage after the event.</p>
-
-              {/* Existing entries */}
-              {wastageEntries.length > 0 && (
-                <div className="space-y-2 mb-3">
-                  {wastageEntries.map((w, i) => (
-                    <div key={i} className="flex items-start justify-between bg-cream rounded-lg p-2.5">
-                      <div>
-                        <p className="text-xs font-medium text-text-primary">{w.item} — {w.qty}</p>
-                        {w.note && <p className="text-xs text-text-muted">{w.note}</p>}
-                      </div>
-                      <button onClick={() => setWastageEntries(e => e.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 ml-2">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2 mb-3">
-                <input value={wastageItem} onChange={e => setWastageItem(e.target.value)} className="input" placeholder="Item (e.g. Biryani)" />
-                <input value={wastageQty} onChange={e => setWastageQty(e.target.value)} className="input" placeholder="Quantity (e.g. 10 kg)" />
-                <textarea value={wastageNote} onChange={e => setWastageNote(e.target.value)} className="input" rows={2} placeholder="Notes…" />
-              </div>
-              <button onClick={addWastageEntry} className="btn-secondary w-full text-xs">Add Wastage Entry</button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -251,7 +303,7 @@ export default function BookingDetails() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <p className="font-semibold text-text-primary">Expense Report — {booking.id}</p>
+              <p className="font-semibold text-text-primary">Expense Report — {booking.bookingId}</p>
               <button onClick={() => setShowExpense(false)} className="text-text-muted hover:text-text-primary text-lg">×</button>
             </div>
             <div className="p-6 space-y-3">
@@ -261,7 +313,7 @@ export default function BookingDetails() {
               {bookingExpenses.length === 0 ? (
                 <p className="text-sm text-text-muted text-center py-4">No expenses logged yet.</p>
               ) : bookingExpenses.map(e => (
-                <div key={e.id} className="flex justify-between text-sm">
+                <div key={e._id} className="flex justify-between text-sm">
                   <span className="text-text-primary">{e.description}</span>
                   <span className="font-medium">PKR {e.amount.toLocaleString()}</span>
                 </div>
@@ -275,7 +327,7 @@ export default function BookingDetails() {
                   <span>Total Expenses</span>
                   <span className="text-red-500">PKR {totalExpenses.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-sm font-bold text-lg">
+                <div className="flex justify-between text-sm font-bold">
                   <span>Net Profit</span>
                   <span className={profit >= 0 ? 'text-green-600' : 'text-red-500'}>PKR {profit.toLocaleString()}</span>
                 </div>

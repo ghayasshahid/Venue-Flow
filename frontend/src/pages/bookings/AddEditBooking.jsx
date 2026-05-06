@@ -1,11 +1,10 @@
-import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { bookings, halls, menuPackages, decorPackages } from '../../data/mockData'
+import { getBooking, getHalls, createBooking, updateBooking, getMenuPackages, getDecorPackages } from '../../lib/api'
 
 const steps = ['Basic Info', 'Services', 'Payment', 'Review']
-
-const eventTypes = ['Wedding', 'Barat', 'Mehndi', 'Walima', 'Corporate Gala', 'Birthday', 'Anniversary', 'Other']
+const eventTypes = ['Wedding', 'Barat', 'Mehndi', 'Walima', 'Corporate Gala', 'Corporate Event', 'Birthday', 'Anniversary Ball', 'Other']
 
 const emptyForm = {
   date: '', time: '', hallId: '', eventType: '', guests: '',
@@ -17,30 +16,79 @@ const emptyForm = {
 export default function AddEditBooking() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const location = useLocation()
   const isEdit = !!id
-  const existing = isEdit ? bookings.find(b => b.id === id) : null
+  const prefill = location.state?.prefill || null
 
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState(() => {
-    if (existing) {
-      const hall = halls.find(h => h.name === existing.hall)
-      const menu = menuPackages.find(m => m.name === existing.menu)
-      const decor = decorPackages.find(d => d.name === existing.decor)
-      return {
-        date: existing.date, time: existing.time,
-        hallId: hall?.id || '', eventType: existing.eventType, guests: existing.guests,
-        customerName: existing.customer, customerPhone: existing.phone, customerEmail: existing.email,
-        menuId: menu?.id || '', decorId: decor?.id || '', customAddons: '',
-        advance: existing.advance, totalAmount: existing.totalAmount, notes: existing.notes,
-      }
-    }
-    return emptyForm
-  })
+  const [halls, setHalls] = useState([])
+  const [menuPackages, setMenuPackages] = useState([])
+  const [decorPackages, setDecorPackages] = useState([])
+  const [form, setForm] = useState(emptyForm)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const fetches = [getHalls(), getMenuPackages(), getDecorPackages()]
+    if (isEdit) fetches.push(getBooking(id))
+
+    Promise.all(fetches)
+      .then(([hallRes, menuRes, decorRes, bookingRes]) => {
+        const fetchedHalls = hallRes.data
+        const fetchedMenus = menuRes.data
+        const fetchedDecors = decorRes.data
+
+        setHalls(fetchedHalls)
+        setMenuPackages(fetchedMenus)
+        setDecorPackages(fetchedDecors)
+
+        if (prefill && !isEdit) {
+          const matchedHall = fetchedHalls.find(
+            h => h.name.toLowerCase() === (prefill.hallName || '').toLowerCase()
+          )
+          setForm(f => ({
+            ...f,
+            customerName: prefill.customerName || '',
+            customerPhone: prefill.customerPhone || '',
+            customerEmail: prefill.customerEmail || '',
+            eventType: prefill.eventType || '',
+            date: prefill.date || '',
+            guests: prefill.guests || '',
+            hallId: matchedHall?._id || '',
+          }))
+        }
+
+        if (isEdit && bookingRes) {
+          const b = bookingRes.data
+          const menu = fetchedMenus.find(m => m.name === b.menu)
+          const decor = fetchedDecors.find(d => d.name === b.decor)
+          setForm({
+            date: b.date ? b.date.split('T')[0] : '',
+            time: b.time || '',
+            hallId: b.hall?._id || b.hall || '',
+            eventType: b.eventType || '',
+            guests: b.guests || '',
+            customerName: b.customer?.name || '',
+            customerPhone: b.customer?.phone || '',
+            customerEmail: b.customer?.email || '',
+            menuId: menu?._id || '',
+            decorId: decor?._id || '',
+            customAddons: '',
+            advance: b.advance || '',
+            totalAmount: b.totalAmount || '',
+            notes: b.notes || '',
+          })
+        }
+      })
+      .catch(() => setError('Failed to load data.'))
+      .finally(() => setLoading(false))
+  }, [id])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const selectedHall = halls.find(h => h.id === Number(form.hallId))
-  const selectedMenu = menuPackages.find(m => m.id === Number(form.menuId))
-  const selectedDecor = decorPackages.find(d => d.id === Number(form.decorId))
+  const selectedHall = halls.find(h => h._id === form.hallId)
+  const selectedMenu = menuPackages.find(m => m._id === form.menuId)
+  const selectedDecor = decorPackages.find(d => d._id === form.decorId)
 
   const canNext = () => {
     if (step === 0) return form.date && form.time && form.hallId && form.eventType && form.guests && form.customerName && form.customerPhone
@@ -49,9 +97,43 @@ export default function AddEditBooking() {
     return true
   }
 
-  const handleSubmit = () => {
-    navigate('/bookings', { state: { toast: isEdit ? 'Booking updated successfully.' : 'Booking created successfully.' } })
+  const handleSubmit = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const payload = {
+        hall: form.hallId,
+        eventType: form.eventType,
+        date: form.date,
+        time: form.time,
+        guests: Number(form.guests),
+        customer: {
+          name: form.customerName,
+          phone: form.customerPhone,
+          email: form.customerEmail,
+        },
+        menu: selectedMenu?.name || 'Standard',
+        decor: selectedDecor?.name || 'Classic White',
+        totalAmount: Number(form.totalAmount),
+        advance: Number(form.advance),
+        notes: form.notes,
+        paymentStatus: Number(form.advance) >= Number(form.totalAmount) ? 'paid' : 'pending',
+      }
+
+      if (isEdit) {
+        await updateBooking(id, payload)
+        navigate('/bookings', { state: { toast: 'Booking updated successfully.' } })
+      } else {
+        await createBooking(payload)
+        navigate('/bookings', { state: { toast: 'Booking created successfully.' } })
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to save booking.')
+      setSaving(false)
+    }
   }
+
+  if (loading) return <div className="card text-center py-16 text-text-muted">Loading…</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -60,7 +142,7 @@ export default function AddEditBooking() {
         <button onClick={() => navigate('/bookings')} className="p-2 hover:bg-white rounded-lg transition-colors">
           <ArrowLeft size={18} className="text-text-muted" />
         </button>
-        <h2 className="font-semibold text-text-primary">{isEdit ? `Edit Booking — ${id}` : 'New Booking'}</h2>
+        <h2 className="font-semibold text-text-primary">{isEdit ? 'Edit Booking' : 'New Booking'}</h2>
       </div>
 
       {/* Step indicator */}
@@ -80,6 +162,16 @@ export default function AddEditBooking() {
         ))}
       </div>
 
+      {prefill && (
+        <div className="bg-accent/10 border border-accent/30 text-accent text-sm rounded-xl px-4 py-3">
+          Pre-filled from booking request — review and complete the remaining fields.
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
+      )}
+
       {/* Step content */}
       <div className="card space-y-5">
         {step === 0 && (
@@ -98,7 +190,7 @@ export default function AddEditBooking() {
                 <label className="label">Hall / Venue *</label>
                 <select value={form.hallId} onChange={e => set('hallId', e.target.value)} className="input">
                   <option value="">Select hall…</option>
-                  {halls.map(h => <option key={h.id} value={h.id}>{h.name} (cap. {h.capacity})</option>)}
+                  {halls.map(h => <option key={h._id} value={h._id}>{h.name} (cap. {h.capacity})</option>)}
                 </select>
               </div>
               <div>
@@ -139,25 +231,23 @@ export default function AddEditBooking() {
         {step === 1 && (
           <>
             <p className="font-semibold text-text-primary">Services</p>
-            {/* Menu */}
             <div>
               <label className="label">Menu Package *</label>
               <div className="grid grid-cols-2 gap-3">
                 {menuPackages.map(m => (
-                  <div key={m.id} onClick={() => set('menuId', m.id)} className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${Number(form.menuId) === m.id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'}`}>
+                  <div key={m._id} onClick={() => set('menuId', m._id)} className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${form.menuId === m._id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'}`}>
                     <p className="font-semibold text-text-primary text-sm">{m.name}</p>
                     <p className="text-xs text-text-muted mt-0.5">{m.price > 0 ? `PKR ${m.price.toLocaleString()}/head` : 'Custom pricing'}</p>
-                    {m.items.length > 0 && <p className="text-xs text-text-muted mt-1 truncate">{m.items.slice(0, 3).join(', ')}…</p>}
+                    {m.items && m.items.length > 0 && <p className="text-xs text-text-muted mt-1 truncate">{m.items.slice(0, 3).join(', ')}…</p>}
                   </div>
                 ))}
               </div>
             </div>
-            {/* Decor */}
             <div>
               <label className="label">Décor Package *</label>
               <div className="grid grid-cols-2 gap-3">
                 {decorPackages.map(d => (
-                  <div key={d.id} onClick={() => set('decorId', d.id)} className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${Number(form.decorId) === d.id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'}`}>
+                  <div key={d._id} onClick={() => set('decorId', d._id)} className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${form.decorId === d._id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'}`}>
                     <p className="font-semibold text-text-primary text-sm">{d.name}</p>
                     <p className="text-xs text-text-muted mt-0.5">{d.price > 0 ? `PKR ${d.price.toLocaleString()}` : 'Custom pricing'}</p>
                     <p className="text-xs text-text-muted mt-1">{d.description}</p>
@@ -203,7 +293,7 @@ export default function AddEditBooking() {
             )}
             <div>
               <label className="label">Notes</label>
-              <textarea value={form.notes} onChange={e => set('notes', e.target.value)} className="input" rows={3} placeholder="Any special instructions or notes for this booking…" />
+              <textarea value={form.notes} onChange={e => set('notes', e.target.value)} className="input" rows={3} placeholder="Any special instructions or notes…" />
             </div>
           </>
         )}
@@ -247,8 +337,8 @@ export default function AddEditBooking() {
             Next <ArrowRight size={14} />
           </button>
         ) : (
-          <button onClick={handleSubmit} className="btn-primary flex items-center gap-2">
-            <Check size={14} /> {isEdit ? 'Update Booking' : 'Confirm Booking'}
+          <button onClick={handleSubmit} disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+            <Check size={14} /> {saving ? 'Saving…' : isEdit ? 'Update Booking' : 'Confirm Booking'}
           </button>
         )}
       </div>
