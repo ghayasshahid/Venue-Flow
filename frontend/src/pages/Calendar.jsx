@@ -179,7 +179,7 @@ export default function Calendar() {
               {selectedBookings.map(b => (
                 <div
                   key={b._id}
-                  onClick={() => navigate(`/bookings/${b._id}`)}
+                  onClick={() => navigate(`/manager/bookings/${b._id}`)}
                   className="flex items-center gap-4 p-3 rounded-xl border border-border hover:bg-cream transition-colors cursor-pointer"
                 >
                   <div className={`w-1 self-stretch rounded-full ${getColor(b)}`} />

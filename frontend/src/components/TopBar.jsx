@@ -16,11 +16,11 @@ export default function TopBar({ title }) {
   const handleLogout = () => {
     setProfileOpen(false)
     logout()
-    navigate('/login', { replace: true })
+    navigate('/manager/login', { replace: true })
   }
 
-  const goToRequests = () => { setNotifOpen(false); navigate('/requests') }
-  const goToSettings = () => { setProfileOpen(false); navigate('/settings') }
+  const goToRequests = () => { setNotifOpen(false); navigate('/manager/requests') }
+  const goToSettings = () => { setProfileOpen(false); navigate('/manager/settings') }
 
   return (
     <header className="h-16 bg-white border-b border-border flex items-center px-6 gap-4 sticky top-0 z-20">

@@ -67,7 +67,7 @@ export default function Dashboard() {
               : 'No pending requests right now. All clear!'}
           </p>
         </div>
-        <button onClick={() => navigate('/requests')} className="btn-primary whitespace-nowrap">
+        <button onClick={() => navigate('/manager/requests')} className="btn-primary whitespace-nowrap">
           Review Requests
         </button>
       </div>
@@ -150,7 +150,7 @@ export default function Dashboard() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <p className="font-semibold text-text-primary">Recent Bookings</p>
-          <button onClick={() => navigate('/bookings')} className="flex items-center gap-1 text-xs text-accent hover:text-accent-dark font-medium transition-colors">
+          <button onClick={() => navigate('/manager/bookings')} className="flex items-center gap-1 text-xs text-accent hover:text-accent-dark font-medium transition-colors">
             View all <ArrowRight size={13} />
           </button>
         </div>
@@ -179,7 +179,7 @@ export default function Dashboard() {
                   <td className="table-td">{b.customer?.name}</td>
                   <td className="table-td"><StatusBadge status={b.paymentStatus} /></td>
                   <td className="table-td">
-                    <button onClick={() => navigate(`/bookings/${b._id}`)} className="text-accent text-xs font-medium hover:underline">
+                    <button onClick={() => navigate(`/manager/bookings/${b._id}`)} className="text-accent text-xs font-medium hover:underline">
                       View
                     </button>
                   </td>

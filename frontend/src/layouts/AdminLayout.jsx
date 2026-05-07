@@ -3,18 +3,19 @@ import Sidebar from '../components/Sidebar'
 import TopBar from '../components/TopBar'
 
 const pageTitles = {
-  '/dashboard': 'Dashboard',
-  '/bookings': 'Bookings',
-  '/calendar': 'Calendar',
-  '/requests': 'Booking Requests',
-  '/finance': 'Finance',
-  '/reports': 'Reports & Logs',
-  '/settings': 'Settings',
+  '/manager/dashboard': 'Dashboard',
+  '/manager/bookings': 'Bookings',
+  '/manager/calendar': 'Calendar',
+  '/manager/requests': 'Booking Requests',
+  '/manager/finance': 'Finance',
+  '/manager/reports': 'Reports & Logs',
+  '/manager/settings': 'Settings',
 }
 
 export default function AdminLayout() {
   const location = useLocation()
-  const path = '/' + location.pathname.split('/')[1]
+  const segments = location.pathname.split('/')
+  const path = '/' + segments[1] + '/' + segments[2]
   const title = pageTitles[path] || 'Venue Flow'
 
   return (

@@ -5,13 +5,13 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/bookings', label: 'Bookings', icon: CalendarCheck },
-  { path: '/calendar', label: 'Calendar', icon: Calendar },
-  { path: '/requests', label: 'Requests', icon: Inbox },
-  { path: '/finance', label: 'Finance', icon: DollarSign },
-  { path: '/reports', label: 'Reports', icon: BarChart2 },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/manager/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/manager/bookings', label: 'Bookings', icon: CalendarCheck },
+  { path: '/manager/calendar', label: 'Calendar', icon: Calendar },
+  { path: '/manager/requests', label: 'Requests', icon: Inbox },
+  { path: '/manager/finance', label: 'Finance', icon: DollarSign },
+  { path: '/manager/reports', label: 'Reports', icon: BarChart2 },
+  { path: '/manager/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function Sidebar() {
