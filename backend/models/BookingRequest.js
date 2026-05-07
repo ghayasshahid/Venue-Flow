@@ -10,7 +10,10 @@ const bookingRequestSchema = new mongoose.Schema(
     requestedDate: { type: Date, required: true },
     hall: { type: String, required: true },
     guests: { type: Number, required: true },
-    message: { type: String, default: '' },
+    slot:         { type: String, enum: ['afternoon', 'evening'], required: true },
+    menuPackage:  { type: String, default: '' },
+    decorPackage: { type: String, default: '' },
+    message:      { type: String, default: '' },
     status: {
       type: String,
       enum: ['pending', 'contacted', 'approved', 'rejected'],

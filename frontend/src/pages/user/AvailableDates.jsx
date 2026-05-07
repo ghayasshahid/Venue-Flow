@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getPublicHalls, getPublicAvailability } from '../../lib/api'
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const GOLD      = '#C8A96E'
@@ -9,55 +10,19 @@ const BORDER    = '#E8E5DC'
 const TEXT      = '#1C1C1A'
 const MUTED     = '#6B7280'
 
-// ─── Static data (swap these endpoints out when backend is ready) ─────────────
-const HALLS = [
-  { id: 1, name: 'Royal Grand Hall',  capacity: 800, img: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=700&q=80' },
-  { id: 2, name: 'Pearl Banquet',     capacity: 500, img: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=700&q=80' },
-  { id: 3, name: 'Diamond Suite',     capacity: 300, img: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=700&q=80' },
-  { id: 4, name: 'Garden Marquee',    capacity: 600, img: 'https://images.unsplash.com/photo-1478827387698-1527781a4887?w=700&q=80' },
-  { id: 5, name: 'Crystal Hall',      capacity: 400, img: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=700&q=80' },
-]
-
 const SLOTS = [
   { id: 'afternoon', label: '1:00 PM – 4:00 PM', short: '1–4 PM',   icon: '☀️' },
   { id: 'evening',   label: '7:00 PM – 10:00 PM', short: '7–10 PM', icon: '🌙' },
 ]
 
-const TOTAL_SLOTS = HALLS.length * SLOTS.length   // 10 per day
-
 const MONTH_NAMES = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December']
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-// ─── Deterministic dummy availability ────────────────────────────────────────
-// Uses a linear-congruential hash so the same date always returns the same data.
-// Replace with an API call when the backend is ready.
-function getBookedSet(dateStr) {
-  const [yr, mo, dy] = dateStr.split('-').map(Number)
-  const date = new Date(yr, mo - 1, dy)
-  const dow  = date.getDay()           // 0 Sun … 6 Sat
-  const base = yr * 10000 + mo * 100 + dy
-
-  // Weekend / peak probability
-  const prob = (dow === 5 || dow === 6) ? 68
-             : (dow === 0 || dow === 4) ? 44
-             : 22
-
-  const booked = new Set()
-  HALLS.forEach(h => {
-    SLOTS.forEach((s, si) => {
-      // Deterministic hash — no Math.random()
-      const v = Math.abs(((base * 1664525 + h.id * 22695477 + si * 1013904223) & 0x7fffffff) % 100)
-      if (v < prob) booked.add(`${h.id}-${s.id}`)
-    })
-  })
-  return booked
-}
-
 // ─── Availability → colour mapping ───────────────────────────────────────────
-function availColor(freeSlots) {
-  if (freeSlots === 0) return { bg: '#E5E7EB', fg: '#6B7280', ring: '#9CA3AF', label: 'Fully Booked' }
-  const pct = freeSlots / TOTAL_SLOTS
+function availColor(free, total) {
+  if (total === 0 || free === 0) return { bg: '#E5E7EB', fg: '#6B7280', ring: '#9CA3AF', label: 'Fully Booked' }
+  const pct = free / total
   if (pct > 0.7) return { bg: '#DCFCE7', fg: '#166534', ring: '#4ADE80', label: 'Highly Available' }
   if (pct > 0.5) return { bg: '#D9F99D', fg: '#365314', ring: '#84CC16', label: 'Available' }
   if (pct > 0.3) return { bg: '#FEF9C3', fg: '#713F12', ring: '#FACC15', label: 'Limited' }
@@ -84,15 +49,40 @@ export default function AvailableDates() {
 
   const [viewY, setViewY]   = useState(todayLocal.getFullYear())
   const [viewM, setViewM]   = useState(todayLocal.getMonth())
-  const [selDate, setSelDate] = useState(null)   // 'YYYY-MM-DD'
-  const [selSlot, setSelSlot] = useState(null)   // 'afternoon' | 'evening' | null
+  const [selDate, setSelDate] = useState(null)
+  const [selSlot, setSelSlot] = useState(null)
+
+  // Real data state
+  const [halls, setHalls]             = useState([])
+  const [monthBookings, setMonthBookings] = useState([])   // [{ date, hallId, slot }]
+  const [hallsLoading, setHallsLoading]   = useState(true)
+  const [availLoading, setAvailLoading]   = useState(false)
+  const [error, setError]             = useState(null)
+
+  // Fetch halls once on mount
+  useEffect(() => {
+    getPublicHalls()
+      .then(res => setHalls(res.data || []))
+      .catch(err => setError(err.message))
+      .finally(() => setHallsLoading(false))
+  }, [])
+
+  // Fetch availability whenever the viewed month changes
+  useEffect(() => {
+    setAvailLoading(true)
+    getPublicAvailability(viewY, viewM + 1)   // API expects 1-indexed month
+      .then(res => setMonthBookings(res.data || []))
+      .catch(err => setError(err.message))
+      .finally(() => setAvailLoading(false))
+  }, [viewY, viewM])
+
+  const TOTAL_SLOTS = halls.length * SLOTS.length
 
   // ── Calendar grid ──────────────────────────────────────────────────────────
   const calCells = useMemo(() => {
-    const firstDow   = new Date(viewY, viewM, 1).getDay()
+    const firstDow    = new Date(viewY, viewM, 1).getDay()
     const daysInMonth = new Date(viewY, viewM + 1, 0).getDate()
-    const cells = Array(firstDow).fill(null)   // leading blanks
-
+    const cells = Array(firstDow).fill(null)
     for (let d = 1; d <= daysInMonth; d++) {
       const key  = toDateKey(viewY, viewM, d)
       const date = new Date(viewY, viewM, d)
@@ -103,22 +93,29 @@ export default function AvailableDates() {
   }, [viewY, viewM])
 
   // ── Booking data for selected date ─────────────────────────────────────────
-  const bookedSet = useMemo(() => selDate ? getBookedSet(selDate) : new Set(), [selDate])
+  // bookedSet contains strings like "<hallId>-<slot>"
+  const bookedSet = useMemo(() => {
+    if (!selDate) return new Set()
+    return new Set(
+      monthBookings
+        .filter(b => b.date === selDate)
+        .map(b => `${b.hallId}-${b.slot}`)
+    )
+  }, [selDate, monthBookings])
 
-  // All halls enriched with per-slot status
   const hallRows = useMemo(() => {
     if (!selDate) return []
-    return HALLS.map(h => {
-      const slots = SLOTS.map(s => ({ ...s, free: !bookedSet.has(`${h.id}-${s.id}`) }))
-      return { ...h, slots, anyFree: slots.some(s => s.free) }
+    return halls.map(h => {
+      const id    = h._id.toString()
+      const slots = SLOTS.map(s => ({ ...s, free: !bookedSet.has(`${id}-${s.id}`) }))
+      return { ...h, id, slots, anyFree: slots.some(s => s.free) }
     })
-  }, [selDate, bookedSet])
+  }, [selDate, bookedSet, halls])
 
-  // Filtered list depending on whether a slot is pinned
   const visibleHalls = useMemo(() => {
     if (!selDate) return []
-    if (!selSlot) return hallRows               // date-only: show all
-    return hallRows.filter(h => !bookedSet.has(`${h.id}-${selSlot}`))  // date+slot: only available
+    if (!selSlot) return hallRows
+    return hallRows.filter(h => !bookedSet.has(`${h.id}-${selSlot}`))
   }, [hallRows, selDate, selSlot, bookedSet])
 
   // ── Month navigation ───────────────────────────────────────────────────────
@@ -141,7 +138,6 @@ export default function AvailableDates() {
         .ad * { box-sizing:border-box; margin:0; padding:0; }
         .ad-serif { font-family:'Playfair Display',Georgia,serif; }
 
-        /* Calendar cell */
         .cal-cell {
           aspect-ratio:1; display:flex; flex-direction:column;
           align-items:center; justify-content:center;
@@ -162,7 +158,6 @@ export default function AvailableDates() {
           width:4px; height:4px; border-radius:50%; background:${GOLD};
         }
 
-        /* Hall card */
         .hall-card {
           background:#fff; border-radius:16px; border:1px solid ${BORDER};
           overflow:hidden;
@@ -170,7 +165,6 @@ export default function AvailableDates() {
         }
         .hall-card:hover { transform:translateY(-4px); box-shadow:0 14px 36px rgba(0,0,0,.10); }
 
-        /* Slot pill filter button */
         .slot-pill {
           display:inline-flex; align-items:center; gap:5px;
           padding:7px 16px; border-radius:50px; font-size:.82rem;
@@ -181,14 +175,12 @@ export default function AvailableDates() {
         }
         .slot-pill:hover { transform:translateY(-1px); }
 
-        /* Hall slot badge */
         .slot-badge {
           display:inline-flex; align-items:center; gap:5px;
           padding:5px 13px; border-radius:50px; font-size:.78rem; font-weight:500;
           border:1px solid;
         }
 
-        /* Month nav button */
         .mnav {
           width:34px; height:34px; border-radius:8px; cursor:pointer;
           display:flex; align-items:center; justify-content:center;
@@ -198,7 +190,6 @@ export default function AvailableDates() {
         }
         .mnav:hover { background:${DARK}; color:#fff; border-color:${DARK}; }
 
-        /* Gold CTA button */
         .gold-btn {
           display:inline-flex; align-items:center; gap:6px;
           background:${GOLD}; color:#fff; border:none; cursor:pointer;
@@ -207,7 +198,6 @@ export default function AvailableDates() {
         }
         .gold-btn:hover { background:#b8935a; transform:translateY(-1px); }
 
-        /* Responsive */
         @media (max-width:900px) {
           .ad-layout { flex-direction:column !important; }
           .ad-cal    { max-width:100% !important; width:100% !important; flex-shrink:1 !important; }
@@ -268,6 +258,16 @@ export default function AvailableDates() {
           </p>
         </div>
 
+        {/* ── ERROR BANNER ─────────────────────────────────────────────────── */}
+        {error && (
+          <div style={{
+            background:'#FEE2E2', border:'1px solid #FECACA', color:'#991B1B',
+            padding:'12px 24px', textAlign:'center', fontSize:'.88rem',
+          }}>
+            {error} — please refresh or try again.
+          </div>
+        )}
+
         {/* ── MAIN LAYOUT ─────────────────────────────────────────────────── */}
         <div className="ad-layout" style={{
           display:'flex', gap:'22px',
@@ -275,10 +275,8 @@ export default function AvailableDates() {
           alignItems:'flex-start',
         }}>
 
-          {/* ── LEFT COLUMN: Calendar + Legend ──────────────────────────── */}
+          {/* ── LEFT COLUMN: Calendar ────────────────────────────────────── */}
           <div className="ad-cal" style={{ width:'400px', flexShrink:0 }}>
-
-            {/* Calendar card */}
             <div style={{
               background:'#fff', borderRadius:'18px', border:`1px solid ${BORDER}`,
               padding:'22px', marginBottom:'16px', boxShadow:'0 2px 12px rgba(0,0,0,.04)',
@@ -288,6 +286,9 @@ export default function AvailableDates() {
                 <button className="mnav" onClick={prevMonth}>‹</button>
                 <h2 style={{ fontWeight:700, fontSize:'1rem', color:TEXT }}>
                   {MONTH_NAMES[viewM]} {viewY}
+                  {availLoading && (
+                    <span style={{ marginLeft:'8px', fontSize:'.7rem', color:MUTED, fontWeight:400 }}>loading…</span>
+                  )}
                 </h2>
                 <button className="mnav" onClick={nextMonth}>›</button>
               </div>
@@ -328,14 +329,24 @@ export default function AvailableDates() {
                 })}
               </div>
             </div>
-
           </div>
 
           {/* ── RIGHT COLUMN: Results ────────────────────────────────────── */}
           <div className="ad-results" style={{ flex:1, minWidth:0 }}>
 
-            {/* ── No date selected ── */}
-            {!selDate && (
+            {/* Loading state */}
+            {hallsLoading && (
+              <div style={{
+                background:'#fff', borderRadius:'18px', border:`1px solid ${BORDER}`,
+                padding:'80px 40px', textAlign:'center',
+                boxShadow:'0 2px 12px rgba(0,0,0,.04)',
+              }}>
+                <p style={{ color:MUTED, fontSize:'1rem' }}>Loading halls…</p>
+              </div>
+            )}
+
+            {/* No date selected */}
+            {!hallsLoading && !selDate && (
               <div style={{
                 background:'#fff', borderRadius:'18px', border:`1px solid ${BORDER}`,
                 padding:'80px 40px', textAlign:'center',
@@ -351,16 +362,15 @@ export default function AvailableDates() {
               </div>
             )}
 
-            {/* ── Date selected ── */}
-            {selDate && (
+            {/* Date selected */}
+            {!hallsLoading && selDate && (
               <>
-                {/* Date header + availability summary + slot filter */}
+                {/* Date header + summary + slot filter */}
                 <div style={{
                   background:'#fff', borderRadius:'18px', border:`1px solid ${BORDER}`,
                   padding:'22px 24px', marginBottom:'16px',
                   boxShadow:'0 2px 12px rgba(0,0,0,.04)',
                 }}>
-                  {/* Title row */}
                   <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px', marginBottom:'6px', flexWrap:'wrap' }}>
                     <div>
                       <p style={{ color:MUTED, fontSize:'.7rem', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'5px' }}>
@@ -370,18 +380,17 @@ export default function AvailableDates() {
                         {prettyDate(selDate)}
                       </h2>
                     </div>
-                    {/* Availability pill for this day */}
                     <div style={{
                       display:'flex', alignItems:'center', gap:'7px',
                       padding:'6px 14px', borderRadius:'50px', flexShrink:0,
-                      background: availColor(totalFreeOnDay).bg,
-                      border: `1.5px solid ${availColor(totalFreeOnDay).ring}`,
+                      background: availColor(totalFreeOnDay, TOTAL_SLOTS).bg,
+                      border: `1.5px solid ${availColor(totalFreeOnDay, TOTAL_SLOTS).ring}`,
                     }}>
                       <div style={{
                         width:'8px', height:'8px', borderRadius:'50%',
-                        background: availColor(totalFreeOnDay).ring,
+                        background: availColor(totalFreeOnDay, TOTAL_SLOTS).ring,
                       }}/>
-                      <span style={{ fontSize:'.78rem', fontWeight:600, color: availColor(totalFreeOnDay).fg }}>
+                      <span style={{ fontSize:'.78rem', fontWeight:600, color: availColor(totalFreeOnDay, TOTAL_SLOTS).fg }}>
                         {totalFreeOnDay} / {TOTAL_SLOTS} slots free
                       </span>
                     </div>
@@ -393,7 +402,6 @@ export default function AvailableDates() {
                       Filter by Time Slot
                     </p>
                     <div style={{ display:'flex', gap:'8px', flexWrap:'wrap' }}>
-                      {/* All Slots pill */}
                       <button
                         className="slot-pill"
                         onClick={() => setSelSlot(null)}
@@ -407,7 +415,7 @@ export default function AvailableDates() {
                       </button>
 
                       {SLOTS.map(s => {
-                        const freeCount = HALLS.filter(h => !bookedSet.has(`${h.id}-${s.id}`)).length
+                        const freeCount = halls.filter(h => !bookedSet.has(`${h._id}-${s.id}`)).length
                         const active    = selSlot === s.id
                         return (
                           <button
@@ -428,7 +436,7 @@ export default function AvailableDates() {
                               fontSize:'.72rem', fontWeight:700,
                               padding:'1px 7px', borderRadius:'20px', marginLeft:'2px',
                             }}>
-                              {freeCount}/{HALLS.length}
+                              {freeCount}/{halls.length}
                             </span>
                           </button>
                         )
@@ -440,11 +448,11 @@ export default function AvailableDates() {
                 {/* Result count label */}
                 <p style={{ color:MUTED, fontSize:'.82rem', padding:'0 4px', marginBottom:'12px' }}>
                   {selSlot
-                    ? `${visibleHalls.length} of ${HALLS.length} halls available for ${SLOTS.find(s => s.id === selSlot)?.short}`
-                    : `All ${HALLS.length} halls — tap a slot above to filter`}
+                    ? `${visibleHalls.length} of ${halls.length} halls available for ${SLOTS.find(s => s.id === selSlot)?.short}`
+                    : `All ${halls.length} halls — tap a slot above to filter`}
                 </p>
 
-                {/* ── Hall cards ── */}
+                {/* Hall cards */}
                 <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
                   {visibleHalls.map(hall => {
                     const displaySlots = selSlot
@@ -457,18 +465,19 @@ export default function AvailableDates() {
                         <div style={{ display:'flex', alignItems:'stretch' }}>
 
                           {/* Thumbnail */}
-                          <div className="hall-thumb" style={{ width:'135px', flexShrink:0 }}>
-                            <img
-                              src={hall.img}
-                              alt={hall.name}
-                              loading="lazy"
-                              style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
-                            />
-                          </div>
+                          {hall.image && (
+                            <div className="hall-thumb" style={{ width:'135px', flexShrink:0 }}>
+                              <img
+                                src={hall.image}
+                                alt={hall.name}
+                                loading="lazy"
+                                style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+                              />
+                            </div>
+                          )}
 
                           {/* Info */}
                           <div style={{ flex:1, padding:'18px 20px', display:'flex', flexDirection:'column', justifyContent:'center', gap:'12px' }}>
-                            {/* Name + capacity heading */}
                             <div>
                               <h3 style={{ fontSize:'1.05rem', fontWeight:700, color:TEXT, marginBottom:'3px' }}>
                                 {hall.name}
@@ -496,7 +505,6 @@ export default function AvailableDates() {
                                 </span>
                               ))}
 
-                              {/* Fully booked tag */}
                               {!hall.anyFree && !selSlot && (
                                 <span style={{
                                   padding:'5px 12px', borderRadius:'50px', fontSize:'.75rem',
@@ -509,7 +517,7 @@ export default function AvailableDates() {
                             </div>
                           </div>
 
-                          {/* CTA column */}
+                          {/* CTA */}
                           {showCTA && (
                             <div style={{
                               padding:'18px 20px', display:'flex', alignItems:'center',

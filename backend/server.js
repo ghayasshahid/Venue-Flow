@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.local') })
 const express = require('express')
 const cors = require('cors')
 const connectDB = require('./config/db')
@@ -13,6 +13,9 @@ connectDB().catch((err) => {
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }))
 app.use(express.json())
+
+// Public routes (no auth)
+app.use('/api/public', require('./routes/public'))
 
 // Admin routes
 app.use('/api/admin/auth', require('./routes/auth'))

@@ -67,6 +67,32 @@ export const exportBookingsCSV = (params = {}) => {
     })
 }
 
+// Public — no auth token required
+export const getPublicHalls = () =>
+  fetch('http://localhost:5000/api/public/halls').then(async (r) => {
+    const json = await r.json()
+    if (!r.ok) throw new Error(json.message || 'Failed to load halls')
+    return json
+  })
+
+export const getPublicAvailability = (year, month) =>
+  fetch(`http://localhost:5000/api/public/availability?year=${year}&month=${month}`).then(async (r) => {
+    const json = await r.json()
+    if (!r.ok) throw new Error(json.message || 'Failed to load availability')
+    return json
+  })
+
+export const createBookingRequest = (data) =>
+  fetch('http://localhost:5000/api/admin/requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(async (res) => {
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.message || 'Failed to submit request')
+    return json
+  })
+
 // Requests
 export const getRequests = (params = {}) => {
   const qs = new URLSearchParams(params).toString()

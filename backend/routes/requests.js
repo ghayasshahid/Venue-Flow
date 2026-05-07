@@ -8,9 +8,13 @@ const {
 } = require('../controllers/requestController')
 const { protect } = require('../middleware/auth')
 
-router.use(protect)
+// POST is public — user-side booking form submits here without a token
+router.post('/', createRequest)
 
-router.route('/').get(getAllRequests).post(createRequest)
-router.route('/:id').get(getRequest).put(updateRequestStatus).delete(deleteRequest)
+// All other operations require admin auth
+router.get('/', protect, getAllRequests)
+router.get('/:id', protect, getRequest)
+router.put('/:id', protect, updateRequestStatus)
+router.delete('/:id', protect, deleteRequest)
 
 module.exports = router
