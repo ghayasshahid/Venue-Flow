@@ -44,7 +44,7 @@ export default function BookingDetails() {
   if (notFound || !booking) return (
     <div className="card text-center py-16">
       <p className="text-text-muted">Booking not found.</p>
-      <button onClick={() => navigate('/bookings')} className="btn-primary mt-4">Back to Bookings</button>
+      <button onClick={() => navigate('/manager/bookings')} className="btn-primary mt-4">Back to Bookings</button>
     </div>
   )
 
@@ -132,7 +132,7 @@ export default function BookingDetails() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/bookings')} className="p-2 hover:bg-white rounded-lg transition-colors">
+          <button onClick={() => navigate('/manager/bookings')} className="p-2 hover:bg-white rounded-lg transition-colors">
             <ArrowLeft size={18} className="text-text-muted" />
           </button>
           <div>
@@ -148,7 +148,7 @@ export default function BookingDetails() {
           <button onClick={() => setShowExpense(true)} className="btn-secondary flex items-center gap-1.5">
             <FileText size={14} /> Expense Report
           </button>
-          <button onClick={() => navigate(`/bookings/${id}/edit`)} className="btn-primary flex items-center gap-1.5">
+          <button onClick={() => navigate(`/manager/bookings/${id}/edit`)} className="btn-primary flex items-center gap-1.5">
             <Edit size={14} /> Edit Booking
           </button>
         </div>

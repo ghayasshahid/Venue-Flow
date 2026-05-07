@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/dashboard', { replace: true })
+      navigate('/manager/dashboard', { replace: true })
     } catch (err) {
       setError(err.message || 'Invalid credentials')
     } finally {

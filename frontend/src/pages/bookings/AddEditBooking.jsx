@@ -122,10 +122,10 @@ export default function AddEditBooking() {
 
       if (isEdit) {
         await updateBooking(id, payload)
-        navigate('/bookings', { state: { toast: 'Booking updated successfully.' } })
+        navigate('/manager/bookings', { state: { toast: 'Booking updated successfully.' } })
       } else {
         await createBooking(payload)
-        navigate('/bookings', { state: { toast: 'Booking created successfully.' } })
+        navigate('/manager/bookings', { state: { toast: 'Booking created successfully.' } })
       }
     } catch (err) {
       setError(err.message || 'Failed to save booking.')
@@ -139,7 +139,7 @@ export default function AddEditBooking() {
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/bookings')} className="p-2 hover:bg-white rounded-lg transition-colors">
+        <button onClick={() => navigate('/manager/bookings')} className="p-2 hover:bg-white rounded-lg transition-colors">
           <ArrowLeft size={18} className="text-text-muted" />
         </button>
         <h2 className="font-semibold text-text-primary">{isEdit ? 'Edit Booking' : 'New Booking'}</h2>
@@ -329,7 +329,7 @@ export default function AddEditBooking() {
 
       {/* Navigation */}
       <div className="flex justify-between">
-        <button onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/bookings')} className="btn-secondary flex items-center gap-2">
+        <button onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/manager/bookings')} className="btn-secondary flex items-center gap-2">
           <ArrowLeft size={14} /> {step === 0 ? 'Cancel' : 'Back'}
         </button>
         {step < steps.length - 1 ? (

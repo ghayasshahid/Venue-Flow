@@ -38,7 +38,7 @@ export default function Requests() {
 
   // Pass all request fields so the booking form can pre-fill without asking again
   const addAsBooking = (req) => {
-    navigate('/bookings/new', {
+    navigate('/manager/bookings/new', {
       state: {
         prefill: {
           customerName: req.customer,

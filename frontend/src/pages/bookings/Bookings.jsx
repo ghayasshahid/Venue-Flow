@@ -136,7 +136,7 @@ export default function Bookings() {
           <button onClick={clearFilters} className="btn-secondary flex items-center gap-1.5 self-end text-text-muted">
             <X size={14} /> Clear
           </button>
-          <button className="btn-primary flex items-center gap-1.5 self-end ml-auto" onClick={() => navigate('/bookings/new')}>
+          <button className="btn-primary flex items-center gap-1.5 self-end ml-auto" onClick={() => navigate('/manager/bookings/new')}>
             <Plus size={15} /> New Booking
           </button>
         </div>
@@ -180,8 +180,8 @@ export default function Bookings() {
                   <td className="table-td"><StatusBadge status={b.paymentStatus} /></td>
                   <td className="table-td">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => navigate(`/bookings/${b._id}`)} className="text-accent text-xs font-medium hover:underline">View</button>
-                      <button onClick={() => navigate(`/bookings/${b._id}/edit`)} className="text-text-muted text-xs hover:text-text-primary">Edit</button>
+                      <button onClick={() => navigate(`/manager/bookings/${b._id}`)} className="text-accent text-xs font-medium hover:underline">View</button>
+                      <button onClick={() => navigate(`/manager/bookings/${b._id}/edit`)} className="text-text-muted text-xs hover:text-text-primary">Edit</button>
                     </div>
                   </td>
                 </tr>
