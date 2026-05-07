@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import MenuSection from './Menu'
+import DecorSection from './Decor'
 
 const GOLD = '#C8A96E'
 const DARK = '#1A1A18'
@@ -57,12 +59,21 @@ export default function Home() {
   const navigate = useNavigate()
   const [scrollY, setScrollY] = useState(0)
   const [showSticky, setShowSticky] = useState(false)
+  const [activeSection, setActiveSection] = useState('')
   useReveal()
 
   useEffect(() => {
+    const sectionIds = ['vf-gallery', 'vf-features', 'vf-menu', 'vf-decor', 'vf-contact']
     const onScroll = () => {
       setScrollY(window.scrollY)
       setShowSticky(window.scrollY > 500)
+      const mid = window.scrollY + window.innerHeight / 2
+      let active = ''
+      sectionIds.forEach(id => {
+        const el = document.getElementById(id)
+        if (el && el.offsetTop <= mid) active = id.replace('vf-', '')
+      })
+      setActiveSection(active)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
@@ -145,9 +156,10 @@ export default function Home() {
         .vf-nav-link {
           color:rgba(255,255,255,.75); text-decoration:none;
           font-size:.88rem; font-weight:500; letter-spacing:.02em;
-          transition:color .2s;
+          transition:color .2s; cursor:pointer;
         }
         .vf-nav-link:hover { color:${GOLD}; }
+        .vf-nav-active { color:${GOLD} !important; }
 
         .vf-scroll-line {
           width:1px; height:48px;
@@ -218,9 +230,11 @@ export default function Home() {
             <span style={{ color:'#fff', fontWeight:600, fontSize:'1.05rem', letterSpacing:'.01em' }}>Venue Flow</span>
           </div>
           <div className="vf-nav-links" style={{ display:'flex', alignItems:'center', gap:'32px' }}>
-            <a className="vf-nav-link" href="#vf-gallery">Gallery</a>
-            <a className="vf-nav-link" href="#vf-features">Features</a>
-            <a className="vf-nav-link" href="#vf-contact">Contact</a>
+            <a className={`vf-nav-link${activeSection === 'gallery' ? ' vf-nav-active' : ''}`} href="#vf-gallery" onClick={e => { e.preventDefault(); document.getElementById('vf-gallery')?.scrollIntoView({ behavior:'smooth' }) }}>Gallery</a>
+            <a className={`vf-nav-link${activeSection === 'features' ? ' vf-nav-active' : ''}`} href="#vf-features" onClick={e => { e.preventDefault(); document.getElementById('vf-features')?.scrollIntoView({ behavior:'smooth' }) }}>Features</a>
+            <a className={`vf-nav-link${activeSection === 'menu' ? ' vf-nav-active' : ''}`} href="#vf-menu" onClick={e => { e.preventDefault(); document.getElementById('vf-menu')?.scrollIntoView({ behavior:'smooth' }) }}>Menu</a>
+            <a className={`vf-nav-link${activeSection === 'decor' ? ' vf-nav-active' : ''}`} href="#vf-decor" onClick={e => { e.preventDefault(); document.getElementById('vf-decor')?.scrollIntoView({ behavior:'smooth' }) }}>Décor</a>
+            <a className={`vf-nav-link${activeSection === 'contact' ? ' vf-nav-active' : ''}`} href="#vf-contact" onClick={e => { e.preventDefault(); document.getElementById('vf-contact')?.scrollIntoView({ behavior:'smooth' }) }}>Contact</a>
             <button
               className="vf-gold-btn"
               style={{ padding:'9px 20px', borderRadius:'8px', fontSize:'.85rem' }}
@@ -458,6 +472,63 @@ export default function Home() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* ── MENU ────────────────────────────────────────────────── */}
+        <section id="vf-menu">
+          <div style={{
+            background: DARK, padding:'80px 40px 52px',
+            textAlign:'center', position:'relative', overflow:'hidden',
+          }}>
+            <img
+              src="https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=1400&q=60"
+              alt="" aria-hidden
+              style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.14 }}
+            />
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:'2px', background:`linear-gradient(90deg, transparent, ${GOLD}, transparent)` }} />
+            <p className="vf-reveal" style={{ color:GOLD, fontSize:'.75rem', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'14px', position:'relative' }}>
+              Our Catering
+            </p>
+            <h2 className="vf-reveal vf-reveal-d1 vf-serif" style={{ color:'#fff', fontSize:'clamp(1.9rem,3.5vw,2.8rem)', fontWeight:400, marginBottom:'14px', position:'relative' }}>
+              A Feast Worthy of <em style={{ color:GOLD }}>Your Celebration</em>
+            </h2>
+            <p className="vf-reveal vf-reveal-d2" style={{ color:'rgba(255,255,255,.58)', fontSize:'.95rem', maxWidth:'480px', margin:'0 auto', lineHeight:1.8, position:'relative' }}>
+              From fragrant biryanis to decadent mithai — every dish crafted by our master chefs for your most cherished day.
+            </p>
+          </div>
+          <MenuSection />
+        </section>
+
+        {/* ── DECOR ───────────────────────────────────────────────── */}
+        <section id="vf-decor">
+          <div style={{
+            background: DARK, padding:'80px 40px 52px',
+            textAlign:'center', position:'relative', overflow:'hidden',
+          }}>
+            <img
+              src="https://images.unsplash.com/photo-1519225421980-b20171be9f68?w=1600&q=50"
+              alt="" aria-hidden
+              style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.13 }}
+            />
+            <div style={{ position:'absolute', top:0, left:0, right:0, height:'2px', background:`linear-gradient(90deg, transparent, ${GOLD}, transparent)` }} />
+            <p className="vf-reveal" style={{ color:GOLD, fontSize:'.75rem', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'14px', position:'relative' }}>
+              Décor & Styling
+            </p>
+            <h2 className="vf-reveal vf-reveal-d1 vf-serif" style={{ color:'#fff', fontSize:'clamp(1.9rem,3.5vw,2.8rem)', fontWeight:400, marginBottom:'14px', position:'relative' }}>
+              Spaces That Tell <em style={{ color:GOLD }}>Your Love Story</em>
+            </h2>
+            <p className="vf-reveal vf-reveal-d2" style={{ color:'rgba(255,255,255,.58)', fontSize:'.95rem', maxWidth:'480px', margin:'0 auto 32px', lineHeight:1.8, position:'relative' }}>
+              From lush floral arches to shimmering fairy-light canopies — every detail designed to make your celebration unforgettable.
+            </p>
+            <button
+              className="vf-gold-btn vf-reveal vf-reveal-d3"
+              style={{ padding:'13px 30px', borderRadius:'9px', fontSize:'.9rem', position:'relative' }}
+              onClick={() => navigate('/request-booking')}
+            >
+              Request a Décor Quote →
+            </button>
+          </div>
+          <DecorSection />
         </section>
 
         {/* ── JOIN SECTION ───────────────────────────────────────── */}

@@ -184,7 +184,11 @@ export default function AddEditBooking() {
               </div>
               <div>
                 <label className="label">Start Time *</label>
-                <input type="time" value={form.time} onChange={e => set('time', e.target.value)} className="input" />
+                <select value={form.time} onChange={e => set('time', e.target.value)} className="input">
+                  <option value="">Select slot…</option>
+                  <option value="13:00">1:00 PM – 4:00 PM (Afternoon)</option>
+                  <option value="19:00">7:00 PM – 10:00 PM (Evening)</option>
+                </select>
               </div>
               <div>
                 <label className="label">Hall / Venue *</label>
