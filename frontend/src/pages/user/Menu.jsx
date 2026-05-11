@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 const GOLD = "#C8A96E";
 const DARK = "#1A1A18";
@@ -308,7 +307,6 @@ function getBadgeStyle(type) {
 }
 
 export default function MenuSection() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("starters");
   const [hoveredCard, setHoveredCard] = useState(null);
   const [hoveredPkg, setHoveredPkg] = useState(null);
@@ -747,67 +745,11 @@ export default function MenuSection() {
                   ))}
                 </ul>
 
-                <button
-                  className={`mnu-pkg-btn${pkg.featured ? " mnu-pkg-btn-featured" : ""}`}
-                  style={
-                    pkg.featured
-                      ? { background: GOLD, borderColor: GOLD, color: "#fff" }
-                      : {}
-                  }
-                  onClick={() => navigate('/request-booking')}
-                >
-                  Inquire Now
-                </button>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── CTA BAR ──────────────────────────────────────────── */}
-        <section
-          style={{
-            background: CREAM,
-            padding: "56px 40px",
-            textAlign: "center",
-            borderTop: `1px solid ${BORDER}`,
-          }}
-        >
-          <h2
-            className="mnu-serif"
-            style={{
-              color: TEXT,
-              fontSize: "clamp(1.5rem,3vw,2rem)",
-              fontWeight: 400,
-              marginBottom: "10px",
-            }}
-          >
-            Ready to plan your <em style={{ color: GOLD }}>dream menu?</em>
-          </h2>
-          <p
-            style={{
-              color: MUTED,
-              fontSize: ".9rem",
-              maxWidth: "400px",
-              margin: "0 auto 28px",
-              lineHeight: 1.8,
-            }}
-          >
-            Our catering team will craft a bespoke menu tailored to your
-            family's traditions and preferences.
-          </p>
-          <button
-            className="mnu-gold-btn"
-            style={{
-              padding: "14px 32px",
-              borderRadius: "9px",
-              fontSize: ".9rem",
-              letterSpacing: ".04em",
-            }}
-            onClick={() => navigate('/request-booking')}
-          >
-            Talk to Our Chef Team →
-          </button>
-        </section>
       </div>
     </>
   );

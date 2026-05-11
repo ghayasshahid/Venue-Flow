@@ -517,16 +517,9 @@ export default function Home() {
             <h2 className="vf-reveal vf-reveal-d1 vf-serif" style={{ color:'#fff', fontSize:'clamp(1.9rem,3.5vw,2.8rem)', fontWeight:400, marginBottom:'14px', position:'relative' }}>
               Spaces That Tell <em style={{ color:GOLD }}>Your Love Story</em>
             </h2>
-            <p className="vf-reveal vf-reveal-d2" style={{ color:'rgba(255,255,255,.58)', fontSize:'.95rem', maxWidth:'480px', margin:'0 auto 32px', lineHeight:1.8, position:'relative' }}>
+            <p className="vf-reveal vf-reveal-d2" style={{ color:'rgba(255,255,255,.58)', fontSize:'.95rem', maxWidth:'480px', margin:'0 auto', lineHeight:1.8, position:'relative' }}>
               From lush floral arches to shimmering fairy-light canopies — every detail designed to make your celebration unforgettable.
             </p>
-            <button
-              className="vf-gold-btn vf-reveal vf-reveal-d3"
-              style={{ padding:'13px 30px', borderRadius:'9px', fontSize:'.9rem', position:'relative' }}
-              onClick={() => navigate('/request-booking')}
-            >
-              Request a Décor Quote →
-            </button>
           </div>
           <DecorSection />
         </section>

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 const GOLD       = '#C8A96E'
 const DARK       = '#1A1A18'
@@ -310,7 +309,6 @@ function getBadgeStyle(type) {
 }
 
 export default function DecorSection() {
-  const navigate     = useNavigate()
   const [activeTab, setActiveTab]   = useState('floral')
   const [hoveredCard, setHoveredCard] = useState(null)
   const [hoveredPkg, setHoveredPkg]   = useState(null)
@@ -542,25 +540,7 @@ export default function DecorSection() {
                   <p style={{ color: MUTED, fontSize: '.82rem', lineHeight: 1.7, marginBottom: '14px' }}>
                     {item.desc}
                   </p>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    borderTop: `1px solid ${BORDER}`, paddingTop: '14px',
-                  }}>
-                    {/* Enquire link */}
-                    <button
-                      onClick={() => navigate('/request-booking')}
-                      style={{
-                        background: 'none', border: `1px solid ${GOLD}`,
-                        color: GOLD, cursor: 'pointer', fontFamily: 'Lato,sans-serif',
-                        fontSize: '.78rem', fontWeight: 700, padding: '6px 14px',
-                        borderRadius: '6px', letterSpacing: '.04em',
-                        transition: 'background .18s, color .18s',
-                      }}
-                      onMouseOver={e => { e.currentTarget.style.background = GOLD; e.currentTarget.style.color = '#fff' }}
-                      onMouseOut={e  => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = GOLD }}
-                    >
-                      Enquire
-                    </button>
+                  <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: '14px' }}>
                     <span style={{
                       fontSize: '.7rem', fontWeight: 700, letterSpacing: '.05em',
                       textTransform: 'uppercase', color: MUTED,
@@ -648,37 +628,11 @@ export default function DecorSection() {
                   ))}
                 </ul>
 
-                <button
-                  className="dcr-pkg-btn"
-                  style={pkg.featured ? { background: GOLD, borderColor: GOLD, color: '#fff' } : {}}
-                  onClick={() => navigate('/request-booking')}
-                >
-                  Enquire Now
-                </button>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── CTA BAR ──────────────────────────────────────────────── */}
-        <section style={{
-          background: CREAM, padding: '56px 40px',
-          textAlign: 'center', borderTop: `1px solid ${BORDER}`,
-        }}>
-          <h2 className="dcr-serif" style={{ color: TEXT, fontSize: 'clamp(1.5rem,3vw,2rem)', fontWeight: 400, marginBottom: '10px' }}>
-            Ready to design your <em style={{ color: GOLD }}>dream setting?</em>
-          </h2>
-          <p style={{ color: MUTED, fontSize: '.9rem', maxWidth: '400px', margin: '0 auto 28px', lineHeight: 1.8 }}>
-            Our décor team will create a bespoke mood board tailored to your vision, colours, and budget.
-          </p>
-          <button
-            className="dcr-gold-btn"
-            style={{ padding: '14px 32px', borderRadius: '9px', fontSize: '.9rem', letterSpacing: '.04em' }}
-            onClick={() => navigate('/request-booking')}
-          >
-            Talk to Our Décor Team →
-          </button>
-        </section>
 
       </div>
     </>
